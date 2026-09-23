@@ -2,6 +2,7 @@ local Library = {}
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local localPlayer = Players.LocalPlayer
 
 function Library:CreateWindow(titleText)
@@ -63,29 +64,80 @@ function Library:CreateWindow(titleText)
         end)
     end
 
-    -- Núcleo de Auto Parry por 81ms (Distancia de emergencia 3.5)
+    -- VARIABLES DE CONTROL ESTRICTO (Puerto exacto de tu lógica en Python)
+    local lastParryTime = 0
+    local cooldown = 0.35 -- Cooldown estricto para evitar spam
+    local parriedThisBall = false
+    local prevDist = nil
+    local prevTime = tick()
+
     RunService.RenderStepped:Connect(function()
         if not autoParryActive then return end
         
         local character = localPlayer.Character
         if not character or not character:FindFirstChild("HumanoidRootPart") then return end
         
+        local rootPart = character.HumanoidRootPart
+        local currentTime = tick()
+        local dt = currentTime - prevTime
+        if dt <= 0 then dt = 0.0001 end
+
+        -- Buscador de la pelota en Blade Ball
         local ballsFolder = workspace:FindFirstChild("Balls")
         if not ballsFolder then return end
         
+        local foundBall = false
         for _, ball in ipairs(ballsFolder:GetChildren()) do
             if ball:IsA("BasePart") then
-                local distance = (character.HumanoidRootPart.Position - ball.Position).Magnitude
-                if distance <= 3.5 then
+                foundBall = true
+                local currentDist = (rootPart.Position - ball.Position).Magnitude
+                
+                -- Velocidad de aproximación 3D (equivalente al flujo óptico)
+                local speed = 0
+                if prevDist then
+                    speed = math.abs(currentDist - prevDist) / dt
+                end
+                
+                local isIncoming = prevDist and (currentDist < prevDist) or true
+                
+                -- Si la pelota se alejó bastante, abrimos de nuevo el permiso de bloqueo
+                if prevDist and currentDist > prevDist + 5 then
+                    parriedThisBall = false
+                end
+                
+                -- Cálculo de Tiempo de Impacto (ETA)
+                local timeToImpact = 999.0
+                if isIncoming and speed > 5 then
+                    timeToImpact = currentDist / speed
+                end
+                
+                -- Gatillo Quirúrgico adaptado a 81ms (ETA < 0.14 o Distancia de emergencia <= 3.5)
+                local preciseTrigger = (isIncoming and timeToImpact < 0.14) or (currentDist <= 3.5)
+                
+                if preciseTrigger and not parriedThisBall and (currentTime - lastParryTime) >= cooldown then
+                    lastParryTime = currentTime
+                    parriedThisBall = true
+                    
+                    print("[Rocket Pro]: ¡Parry ejecutado! Distancia:", currentDist, "ETA:", timeToImpact)
+                    
+                    -- Simulación limpia de la tecla F para el bloqueo
                     task.spawn(function()
-                        local vim = game:GetService("VirtualInputManager")
-                        vim:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                        task.wait(0.05)
-                        vim:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                        task.wait(0.04)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
                     end)
                 end
+                
+                prevDist = currentDist
             end
         end
+
+        if not foundBall then
+            prevDist = nil
+            parriedThisBall = false
+        end
+        
+        prevTime = currentTime
     end)
 
     return Window
