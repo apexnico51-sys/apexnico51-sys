@@ -64,9 +64,9 @@ function Library:CreateWindow(titleText)
         end)
     end
 
-    -- TRaducción exacta de las variables de tu script de Python
+    -- Control de tiempo y estado estricto
     local lastParryTime = 0
-    local cooldown = 0.35          -- Cooldown estricto
+    local cooldown = 0.35
     local parriedThisBall = false
     local prevDist = nil
     local prevTime = tick()
@@ -82,7 +82,6 @@ function Library:CreateWindow(titleText)
         local dt = currentTime - prevTime
         if dt <= 0 then dt = 0.0001 end
 
-        -- Búsqueda de la pelota con mapeo físico directo
         local targetBall = nil
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name:lower():find("ball")) then
@@ -94,7 +93,6 @@ function Library:CreateWindow(titleText)
         if targetBall then
             local currentDist = (rootPart.Position - targetBall.Position).Magnitude
             
-            -- Cálculo de velocidad vectorial (análogo al flujo óptico de Python)
             local speed = 0
             if prevDist then
                 speed = math.abs(currentDist - prevDist) / dt
@@ -102,25 +100,25 @@ function Library:CreateWindow(titleText)
             
             local isIncoming = prevDist and (currentDist < prevDist) or true
             
-            -- Si la pelota se alejó bastante, abrimos de nuevo el cerrojo (equivalente a current_dist > prev_dist + 20)
-            if prevDist and currentDist > prevDist + 10 then
+            -- Reiniciar cerrojo si la pelota se aleja
+            if prevDist and currentDist > prevDist + 8 then
                 parriedThisBall = false
             end
             
-            -- Cálculo de tiempo de impacto estricto (ETA)
             local timeToImpact = 999.0
-            if isIncoming and speed > 5 then
+            if isIncoming and speed > 10 then
                 timeToImpact = currentDist / speed
             end
             
-            -- Gatillo quirúrgico fiel al modelo de Python adaptado a Roblox (ETA < 0.05 o distancia corta a quemarropa)
-            local preciseTrigger = (isIncoming and speed > 20 and timeToImpact < 0.05) or (currentDist <= 3.8)
+            -- GATIGGO QUIRÚRGICO CALIBRADO PARA 81ms: 
+            -- Solo actúa si el ETA es menor a 0.04 (muy cerca) o la distancia es de inminente colisión (<= 6.5 studs)
+            local preciseTrigger = (isIncoming and timeToImpact <= 0.04 and speed > 50) or (currentDist <= 6.5)
             
             if preciseTrigger and not parriedThisBall and (currentTime - lastParryTime) >= cooldown then
                 lastParryTime = currentTime
                 parriedThisBall = true
                 
-                print("[Protocolo Blindado]: ¡Parry ejecutado! Dist:", currentDist, "ETA:", timeToImpact)
+                print("[Rocket Precision]: ¡Bloqueo ejecutado a quemarropa! Dist:", currentDist, "ETA:", timeToImpact)
                 
                 task.spawn(function()
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
@@ -131,7 +129,6 @@ function Library:CreateWindow(titleText)
             
             prevDist = currentDist
         else
-            -- Si no hay pelota, reseteamos el cerrojo exactamente igual que en el script original
             prevDist = nil
             parriedThisBall = false
         end
