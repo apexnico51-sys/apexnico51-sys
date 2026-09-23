@@ -64,32 +64,79 @@ function Library:CreateWindow(titleText)
         end)
     end
 
-    -- Bucle de rastreo global optimizado para Blade Ball
+    -- TRaducción exacta de las variables de tu script de Python
+    local lastParryTime = 0
+    local cooldown = 0.35          -- Cooldown estricto
+    local parriedThisBall = false
+    local prevDist = nil
+    local prevTime = tick()
+
     RunService.RenderStepped:Connect(function()
         if not autoParryActive then return end
         
         local character = localPlayer.Character
-        if not character then return end
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        local rootPart = character.HumanoidRootPart
         
-        -- Buscamos en todo el workspace cualquier parte que tenga el nombre de la pelota o propiedades físicas activas
+        local currentTime = tick()
+        local dt = currentTime - prevTime
+        if dt <= 0 then dt = 0.0001 end
+
+        -- Búsqueda de la pelota con mapeo físico directo
+        local targetBall = nil
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "bola" or obj.Name:lower():find("ball")) then
-                local distance = (rootPart.Position - obj.Position).Magnitude
-                
-                -- Distancia de emergencia directa para tus 81ms
-                if distance <= 4.0 then
-                    print("[Rocket]: ¡Bloqueo forzado por distancia! Dist:", distance)
-                    task.spawn(function()
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                        task.wait(0.04)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
-                    end)
-                    task.wait(0.2) -- Breve pausa interna para evitar bucle de pulsación en el mismo frame
-                end
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name:lower():find("ball")) then
+                targetBall = obj
+                break
             end
         end
+
+        if targetBall then
+            local currentDist = (rootPart.Position - targetBall.Position).Magnitude
+            
+            -- Cálculo de velocidad vectorial (análogo al flujo óptico de Python)
+            local speed = 0
+            if prevDist then
+                speed = math.abs(currentDist - prevDist) / dt
+            end
+            
+            local isIncoming = prevDist and (currentDist < prevDist) or true
+            
+            -- Si la pelota se alejó bastante, abrimos de nuevo el cerrojo (equivalente a current_dist > prev_dist + 20)
+            if prevDist and currentDist > prevDist + 10 then
+                parriedThisBall = false
+            end
+            
+            -- Cálculo de tiempo de impacto estricto (ETA)
+            local timeToImpact = 999.0
+            if isIncoming and speed > 5 then
+                timeToImpact = currentDist / speed
+            end
+            
+            -- Gatillo quirúrgico fiel al modelo de Python adaptado a Roblox (ETA < 0.05 o distancia corta a quemarropa)
+            local preciseTrigger = (isIncoming and speed > 20 and timeToImpact < 0.05) or (currentDist <= 3.8)
+            
+            if preciseTrigger and not parriedThisBall and (currentTime - lastParryTime) >= cooldown then
+                lastParryTime = currentTime
+                parriedThisBall = true
+                
+                print("[Protocolo Blindado]: ¡Parry ejecutado! Dist:", currentDist, "ETA:", timeToImpact)
+                
+                task.spawn(function()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                    task.wait(0.04)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                end)
+            end
+            
+            prevDist = currentDist
+        else
+            -- Si no hay pelota, reseteamos el cerrojo exactamente igual que en el script original
+            prevDist = nil
+            parriedThisBall = false
+        end
+        
+        prevTime = currentTime
     end)
 
     return Window
