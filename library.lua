@@ -1,5 +1,8 @@
 local Library = {}
 local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local localPlayer = Players.LocalPlayer
 
 function Library:CreateWindow(titleText)
     if CoreGui:FindFirstChild("RocketCustomHub") then
@@ -32,6 +35,7 @@ function Library:CreateWindow(titleText)
     Title.Parent = MainFrame
 
     local Window = {}
+    local autoParryActive = true
 
     function Window:AddButton(buttonText, callback)
         local Button = Instance.new("TextButton")
@@ -49,9 +53,40 @@ function Library:CreateWindow(titleText)
         BtnCorner.Parent = Button
 
         Button.MouseButton1Click:Connect(function()
-            pcall(callback)
+            autoParryActive = not autoParryActive
+            if autoParryActive then
+                Button.Text = "Auto Parry: [ ACTIVADO ]"
+            else
+                Button.Text = "Auto Parry: [ DESACTIVADO ]"
+            end
+            pcall(callback, autoParryActive)
         end)
     end
+
+    -- Núcleo de Auto Parry por 81ms (Distancia de emergencia 3.5)
+    RunService.RenderStepped:Connect(function()
+        if not autoParryActive then return end
+        
+        local character = localPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        
+        local ballsFolder = workspace:FindFirstChild("Balls")
+        if not ballsFolder then return end
+        
+        for _, ball in ipairs(ballsFolder:GetChildren()) do
+            if ball:IsA("BasePart") then
+                local distance = (character.HumanoidRootPart.Position - ball.Position).Magnitude
+                if distance <= 3.5 then
+                    task.spawn(function()
+                        local vim = game:GetService("VirtualInputManager")
+                        vim:SendKeyEvent(true, Enum.KeyCode.F, false, game)
+                        task.wait(0.05)
+                        vim:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                    end)
+                end
+            end
+        end
+    end)
 
     return Window
 end
